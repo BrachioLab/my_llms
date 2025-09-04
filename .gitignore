@@ -205,3 +205,15 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+# API Keys and secrets
+.env
+*.key
+secrets/
+
+# Test outputs and dumps  
+_dump.txt
+test_outputs/
+
+# Cache directories (though these are usually in ~/.cache)
+.cache/
+*cache*/

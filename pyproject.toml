@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "my-llms"
+version = "0.1.0"
+description = "Simple LLM API wrapper with caching and batch processing"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Anton Xue", email = "anton.xue@example.com"}
+]
+keywords = ["llm", "openai", "anthropic", "google", "gemini", "api", "caching", "batch-processing", "structured-output", "pydantic"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "openai>=1.75.0,<2.0",
+    "anthropic>=0.50.0,<1.0", 
+    "google-genai>=1.14.0,<2.0",
+    "pydantic>=2.7.0,<3.0",
+    "diskcache>=5.6.0,<6.0",
+    "tqdm>=4.66.0,<5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "black",
+    "isort", 
+    "flake8",
+    "mypy",
+]
+test = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "pytest-xdist",
+]
+
+[project.urls]
+Homepage = "https://github.com/BrachioLab/my-llms"
+Repository = "https://github.com/BrachioLab/my-llms"
+Issues = "https://github.com/BrachioLab/my-llms/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
