@@ -14,7 +14,14 @@ Simple Python wrapper for LLM APIs (OpenAI, Anthropic, Google) with caching and 
 ## Installation
 
 ```bash
+# From PyPI
 pip install my-llms
+
+# For local development
+pip install -e .
+
+# With optional dependencies
+pip install -e .[dev,test]
 ```
 
 ## Quick Start
