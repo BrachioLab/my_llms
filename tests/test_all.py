@@ -338,6 +338,58 @@ class TestProviderSpecific:
             raise
 
 
+class TestRetryBehavior:
+    """Test retry behavior and error handling."""
+    
+    def test_runtime_error_after_retries(self):
+        """Test that RuntimeError is raised with proper message after all retries fail."""
+        config = {
+            "provider": "openai",
+            "model_name": "gpt-invalid-model-that-does-not-exist",
+            "num_tries_per_request": 2,
+            "verbose": False
+        }
+        
+        try:
+            model = load_model(config)
+            # This should fail and raise RuntimeError after retries
+            with pytest.raises(RuntimeError) as exc_info:
+                model("test prompt")
+            
+            error_msg = str(exc_info.value)
+            assert "after 2 attempts" in error_msg
+            assert "Last error:" in error_msg
+            assert "gpt-invalid-model-that-does-not-exist" in error_msg
+            
+        except ValueError as e:
+            if "API key" in str(e):
+                pytest.skip("No OpenAI API key configured")
+            raise
+    
+    def test_retry_with_different_attempt_counts(self):
+        """Test that retry attempts match configuration."""
+        for num_tries in [1, 3, 5]:
+            config = {
+                "provider": "openai",
+                "model_name": "gpt-invalid-model",
+                "num_tries_per_request": num_tries,
+                "verbose": False
+            }
+            
+            try:
+                model = load_model(config)
+                with pytest.raises(RuntimeError) as exc_info:
+                    model("test")
+                
+                error_msg = str(exc_info.value)
+                assert f"after {num_tries} attempts" in error_msg
+                
+            except ValueError as e:
+                if "API key" in str(e):
+                    pytest.skip("No OpenAI API key configured")
+                raise
+
+
 class TestResponseSchemas:
     """Test Pydantic response schema handling."""
     
@@ -625,8 +677,15 @@ def test_retry_logic():
         
         print(f"❌ Unexpectedly got response: {response[:50]}...")
         
+    except RuntimeError as e:
+        # Should get a RuntimeError with details about retry failures
+        error_msg = str(e)
+        if "after 2 attempts" in error_msg and "Last error:" in error_msg:
+            print(f"✓ Correctly raised RuntimeError after retries: {error_msg[:100]}...")
+        else:
+            print(f"⚠️  Got RuntimeError but unexpected message: {error_msg[:100]}...")
     except Exception as e:
-        print(f"✓ Correctly failed after retries: {str(e)[:100]}...")
+        print(f"⚠️  Got unexpected exception type: {type(e).__name__}: {str(e)[:100]}...")
     
     print("✅ Retry logic test completed")
 

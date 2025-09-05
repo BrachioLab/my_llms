@@ -124,6 +124,7 @@ class MyApiModel:
 
         payload = self.prompt_to_payload(prompt)
         response_data = None
+        last_exception = None
 
         for attempt in range(self.num_tries_per_request):
             try:
@@ -144,10 +145,17 @@ class MyApiModel:
                         cache.set(cache_key, item_to_cache)
                     break
             except Exception as e:
+                last_exception = e
                 if self.verbose:
                     print(f"Attempt {attempt + 1} failed for {self.model_name}: {e}")
                 if attempt < self.num_tries_per_request - 1:
                     time.sleep(5 * (2 ** attempt))
+
+        if response_data is None:
+            raise RuntimeError(
+                f"API call failed for {self.model_name} after {self.num_tries_per_request} attempts. "
+                f"Last error: {last_exception}"
+            )
 
         return response_data or ("" if not response_schema else None)
 
