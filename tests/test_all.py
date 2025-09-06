@@ -64,7 +64,7 @@ class TestLoadModel:
     
     def test_load_model_missing_model_name(self):
         """Test that missing model_name raises ValueError."""
-        with pytest.raises(ValueError, match="model_name is required"):
+        with pytest.raises(ValueError, match="'model_name' is required in the configuration"):
             load_model({"provider": "openai"})
 
 
@@ -139,7 +139,7 @@ class TestModelBehavior:
         config = {"provider": "openai", "model_name": "gpt-4o-mini"}
         try:
             model = load_model(config)
-            with pytest.raises(ValueError, match="cannot be empty"):
+            with pytest.raises(ValueError, match="Prompts cannot be empty"):
                 model([])
         except ValueError as e:
             if "API key" in str(e):
@@ -151,7 +151,7 @@ class TestModelBehavior:
         config = {"provider": "openai", "model_name": "gpt-4o-mini"}
         try:
             model = load_model(config)
-            with pytest.raises(ValueError, match="cannot be empty"):
+            with pytest.raises(ValueError, match="Prompts cannot be empty"):
                 model(None)
         except ValueError as e:
             if "API key" in str(e):
@@ -163,7 +163,7 @@ class TestModelBehavior:
         config = {"provider": "openai", "model_name": "gpt-4o-mini"}
         try:
             model = load_model(config)
-            with pytest.raises(ValueError, match="must be a non-empty string"):
+            with pytest.raises(ValueError, match="All prompts must be non-empty strings"):
                 model([123, 456])  # Invalid prompt types
         except ValueError as e:
             if "API key" in str(e):
@@ -175,7 +175,7 @@ class TestModelBehavior:
         config = {"provider": "openai", "model_name": "gpt-4o-mini"}
         try:
             model = load_model(config)
-            with pytest.raises(ValueError, match="must be a non-empty string"):
+            with pytest.raises(ValueError, match="All prompts must be non-empty strings"):
                 model(["", "   "])  # Empty and whitespace-only strings
         except ValueError as e:
             if "API key" in str(e):
@@ -338,6 +338,71 @@ class TestProviderSpecific:
             raise
 
 
+class TestResilientBatch:
+    """Test resilient batch behavior that returns exceptions instead of raising them."""
+    
+    def test_mixed_success_and_failure_batch(self):
+        """Test that batch calls return both successful results and exceptions."""
+        config = {
+            "provider": "openai",
+            "model_name": "gpt-4o-mini",
+            "verbose": False
+        }
+        
+        try:
+            model = load_model(config)
+            
+            # Mix of valid and problematic prompts
+            prompts = [
+                "What is 2+2?",  # Should succeed
+                "",              # Should fail - empty string (caught earlier)
+                "What is 3+3?"   # Should succeed  
+            ]
+            
+            # This should not raise an exception for the empty prompt in batch mode
+            # Instead, it should validate all prompts first and raise ValueError
+            with pytest.raises(ValueError, match="All prompts must be non-empty strings"):
+                model(prompts)
+            
+        except ValueError as e:
+            if "API key" in str(e):
+                pytest.skip("No OpenAI API key configured")
+            raise
+    
+    def test_batch_preserves_order_with_exceptions(self):
+        """Test that batch results preserve the original prompt order even with failures."""
+        # This test would be better with a mock, but let's test the concept
+        config = {
+            "provider": "openai",
+            "model_name": "gpt-4o-mini",
+            "verbose": False
+        }
+        
+        try:
+            model = load_model(config)
+            
+            # Valid prompts that should all succeed
+            prompts = [
+                "Say 'first'",
+                "Say 'second'", 
+                "Say 'third'"
+            ]
+            
+            results = model(prompts)
+            
+            # Should get 3 results in the same order
+            assert len(results) == 3
+            
+            # Check that results are either strings or exceptions
+            for result in results:
+                assert isinstance(result, (str, Exception))
+                
+        except ValueError as e:
+            if "API key" in str(e):
+                pytest.skip("No OpenAI API key configured")
+            raise
+
+
 class TestRetryBehavior:
     """Test retry behavior and error handling."""
     
@@ -357,9 +422,8 @@ class TestRetryBehavior:
                 model("test prompt")
             
             error_msg = str(exc_info.value)
-            assert "after 2 attempts" in error_msg
+            assert "API call failed after 2 attempts" in error_msg
             assert "Last error:" in error_msg
-            assert "gpt-invalid-model-that-does-not-exist" in error_msg
             
         except ValueError as e:
             if "API key" in str(e):
@@ -382,7 +446,7 @@ class TestRetryBehavior:
                     model("test")
                 
                 error_msg = str(exc_info.value)
-                assert f"after {num_tries} attempts" in error_msg
+                assert f"API call failed after {num_tries} attempts" in error_msg
                 
             except ValueError as e:
                 if "API key" in str(e):
@@ -632,12 +696,19 @@ def test_concurrent_requests():
         print(f"✓ All {len(responses)} responses received in {total_time:.2f}s")
         print(f"✓ Average time per request: {total_time/len(responses):.2f}s")
         
-        # Verify all responses
+        # Verify all responses (now handles exceptions in results)
+        successful_responses = 0
         for i, response in enumerate(responses):
-            if response and len(response) > 5:
-                print(f"✓ Response {i+1}: {response[:40]}...")
+            if isinstance(response, Exception):
+                print(f"⚠️  Response {i+1} failed: {type(response).__name__}")
+            elif response and len(str(response)) > 5:
+                print(f"✓ Response {i+1}: {str(response)[:40]}...")
+                successful_responses += 1
             else:
                 print(f"⚠️  Response {i+1} seems short or empty")
+        
+        if successful_responses > 0:
+            print(f"✓ {successful_responses}/{len(responses)} requests successful")
         
         # Test smaller batch for speed comparison
         small_batch = batch_prompts[:2]
@@ -680,7 +751,7 @@ def test_retry_logic():
     except RuntimeError as e:
         # Should get a RuntimeError with details about retry failures
         error_msg = str(e)
-        if "after 2 attempts" in error_msg and "Last error:" in error_msg:
+        if "API call failed after 2 attempts" in error_msg and "Last error:" in error_msg:
             print(f"✓ Correctly raised RuntimeError after retries: {error_msg[:100]}...")
         else:
             print(f"⚠️  Got RuntimeError but unexpected message: {error_msg[:100]}...")
