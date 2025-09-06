@@ -255,7 +255,12 @@ class MyOpenAIModel(MyApiModel):
         )
 
         content = response.choices[0].message.content
-        return content.strip() if content else ""
+        if content:
+            return content.strip()
+        
+        if self.verbose:
+            logger.warning("OpenAI response was empty.")
+        return ""
 
 
 class MyGoogleModel(MyApiModel):
@@ -286,7 +291,8 @@ class MyGoogleModel(MyApiModel):
         if response.text:
             return response.text.strip()
         
-        logger.warning("Gemini response was blocked or empty.")
+        if self.verbose:
+            logger.warning("Gemini response was blocked or empty.")
         return ""
 
 
@@ -313,6 +319,8 @@ class MyAnthropicModel(MyApiModel):
 
         if response.content and isinstance(response.content[0], anthropic.types.TextBlock):
             return response.content[0].text.strip()
+        
+        if self.verbose:
+            logger.warning("Anthropic response was empty or not a TextBlock.")
         return ""
-
 
